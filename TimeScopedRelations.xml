@@ -5,7 +5,7 @@
 	<Type>Automation</Type>
 	<Author>SKYLINE2\PVC</Author>
 	<CheckSets>FALSE</CheckSets>
-	<Folder></Folder>
+	<Folder>AI/GQIDS</Folder>
 
 	<Protocols>
 	</Protocols>
@@ -21,8 +21,8 @@
 			<Value><![CDATA[[Project:TimeScopedRelations_1]]]></Value>
 			<!--<Param type="debug">true</Param>-->
 			<Message></Message>
-      <Param type="preCompile">true</Param>
-      <Param type="libraryName">SLC-GQIDS-TimeScopedRelations</Param>
+			<Param type="preCompile">true</Param>
+			<Param type="libraryName">SLC-GQIDS-TimeScopedRelations</Param>
 		</Exe>
 	</Script>
 </DMSScript>

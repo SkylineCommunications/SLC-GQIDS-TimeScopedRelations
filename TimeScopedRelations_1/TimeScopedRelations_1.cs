@@ -1,22 +1,16 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Skyline.DataMiner.Analytics.GenericInterface;
-using Skyline.DataMiner.Net.Filters;
-using Skyline.DataMiner.Net.Helper;
-using Skyline.DataMiner.Net.Messages;
-using Skyline.DataMiner.Net.MetaData.DataClass;
-using Skyline.DataMiner.Net;
 using System;
+using System.Collections.Generic;
+using Skyline.DataMiner.Analytics.GenericInterface;
 using Skyline.DataMiner.Analytics.TimeScopedRelationDetection;
-using Skyline.DataMiner.Analytics.Relations;
+using Skyline.DataMiner.Net;
+using Skyline.DataMiner.Net.Messages;
 
 [GQIMetaData(Name = "TimeScopedRelations")]
 public class TimeScopedRelations : IGQIDataSource, IGQIOnInit, IGQIOnPrepareFetch, IGQIInputArguments
 {
     private static readonly GQIStringArgument ParameterA = new GQIStringArgument("Parameter") { IsRequired = false }; // make this not required to prevent errors in the dashboards where the value comes from another feed that could be empty
-    private static readonly GQIDateTimeArgument StartTime = new GQIDateTimeArgument("Start Time") { IsRequired = false };// make this not required to prevent errors in the dashboards where the value comes from another feed that could be empty
-    private static readonly GQIDateTimeArgument EndTime = new GQIDateTimeArgument("End Time") { IsRequired = false };// make this not required to prevent errors in the dashboards where the value comes from another feed that could be empty
+    private static readonly GQIDateTimeArgument StartTime = new GQIDateTimeArgument("Start Time") { IsRequired = false }; // make this not required to prevent errors in the dashboards where the value comes from another feed that could be empty
+    private static readonly GQIDateTimeArgument EndTime = new GQIDateTimeArgument("End Time") { IsRequired = false }; // make this not required to prevent errors in the dashboards where the value comes from another feed that could be empty
 
     private static readonly GQIStringColumn ElementColumn = new GQIStringColumn("Related Element");
     private static readonly GQIStringColumn ParameterColumn = new GQIStringColumn("Related Parameter");
@@ -24,11 +18,11 @@ public class TimeScopedRelations : IGQIDataSource, IGQIOnInit, IGQIOnPrepareFetc
     private static readonly GQIDoubleColumn TimeColumn = new GQIDoubleColumn("Confidence");
 
     private GQIDMS _dms;
-    private ParamID _ParameterAValue;
-    private DateTime? _StartTime;
-    private DateTime? _EndTime;
-    private DMSMessage[] _AnalyticsRelations;
-    private Exception _LastError;
+    private ParamID _parameterAValue;
+    private DateTime? _startTime;
+    private DateTime? _endTime;
+    private DMSMessage[] _analyticsRelations;
+    private Exception _lastError;
 
     public OnInitOutputArgs OnInit(OnInitInputArgs args)
     {
@@ -36,7 +30,6 @@ public class TimeScopedRelations : IGQIDataSource, IGQIOnInit, IGQIOnPrepareFetc
         return new OnInitOutputArgs();
     }
 
-    //For Building your query
     public GQIArgument[] GetInputArguments()
     {
         return new GQIArgument[] { ParameterA, StartTime, EndTime };
@@ -44,42 +37,38 @@ public class TimeScopedRelations : IGQIDataSource, IGQIOnInit, IGQIOnPrepareFetc
 
     public OnArgumentsProcessedOutputArgs OnArgumentsProcessed(OnArgumentsProcessedInputArgs args)
     {
-        String paramKey;
-        DateTime start;
-        DateTime end;
+        if (args.TryGetArgumentValue(ParameterA, out string paramKey) && paramKey != null)
+            _parameterAValue = ParamID.FromString(paramKey);
 
-        if (args.TryGetArgumentValue(ParameterA, out paramKey) && paramKey != null)
-            _ParameterAValue = ParamID.FromString(paramKey);
+        if (args.TryGetArgumentValue(StartTime, out DateTime start))
+            _startTime = start;
 
-        if (args.TryGetArgumentValue(StartTime, out start))
-            _StartTime = start;
-
-        if (args.TryGetArgumentValue(EndTime, out end))
-            _EndTime = end;
+        if (args.TryGetArgumentValue(EndTime, out DateTime end))
+            _endTime = end;
 
         return new OnArgumentsProcessedOutputArgs();
     }
 
     public OnPrepareFetchOutputArgs OnPrepareFetch(OnPrepareFetchInputArgs args)
     {
-        // Getting Time scoped relations            
+        // Getting Time scoped relations
         try
         {
-            if (_ParameterAValue == null || _StartTime == null || _EndTime == null)
+            if (_parameterAValue == null || _startTime == null || _endTime == null)
                 return new OnPrepareFetchOutputArgs();
 
-            _LastError = null;
-            GetTimeScopedRelationsMessage req = new GetTimeScopedRelationsMessage(new Skyline.DataMiner.Analytics.DataTypes.ParameterKey(_ParameterAValue.DataMinerID, _ParameterAValue.EID, _ParameterAValue.PID, _ParameterAValue.TableIdx ?? ""), _StartTime.Value, _EndTime.Value);
-            var resp = _dms.SendMessages(req) as DMSMessage[];
+            _lastError = null;
+            GetTimeScopedRelationsMessage req = new GetTimeScopedRelationsMessage(new Skyline.DataMiner.Analytics.DataTypes.ParameterKey(_parameterAValue.DataMinerID, _parameterAValue.EID, _parameterAValue.PID, _parameterAValue.TableIdx ?? string.Empty), _startTime.Value, _endTime.Value);
+            DMSMessage[] resp = _dms.SendMessages(req) as DMSMessage[];
 
             if (resp != null)
             {
-                _AnalyticsRelations = resp;
+                _analyticsRelations = resp;
             }
         }
         catch (Exception ex)
         {
-            _LastError = ex;
+            _lastError = ex;
         }
 
         return new OnPrepareFetchOutputArgs();
@@ -92,43 +81,43 @@ public class TimeScopedRelations : IGQIDataSource, IGQIOnInit, IGQIOnPrepareFetc
                 ElementColumn,
                 ParameterColumn,
                 TableKeyColumn,
-                TimeColumn
+                TimeColumn,
         };
     }
 
     public GQIPage GetNextPage(GetNextPageInputArgs args)
     {
-        if (_LastError != null)
+        if (_lastError != null)
         {
-            return new GQIPage(new GQIRow[1]{ new GQIRow(
+            return new GQIPage(new GQIRow[1]
+			{
+				new GQIRow(
                 new[]
                 {
-                    new GQICell {Value= _LastError.ToString() }, // Related Element
-                    new GQICell {Value= "" }, // Related Parameter,
-                    new GQICell {Value= "" }, // Related TableKey,
-                    new GQICell {Value= (double)0 } // Confidence,
-                    
-                }
-                )
-                    }
-            );
+                    new GQICell {Value= _lastError.ToString() }, // Related Element
+                    new GQICell {Value= string.Empty }, // Related Parameter,
+                    new GQICell {Value= string.Empty }, // Related TableKey,
+                    new GQICell {Value= 0D }, // Confidence,
+                }),
+			});
         }
 
         var rows = new List<GQIRow>();
-        if (_AnalyticsRelations != null)
+        if (_analyticsRelations != null)
         {
-            foreach (DMSMessage ret in _AnalyticsRelations)
+            foreach (DMSMessage ret in _analyticsRelations)
             {
                 if (ret is GetTimeScopedRelationsResponseMessage)
                 {
                     foreach (var relation in (ret as GetTimeScopedRelationsResponseMessage).AnalyticsRelations)
                     {
-                        var cells = new[]{
+                        var cells = new[]
+						{
                                 new GQICell {Value= $"{relation.ParameterB.DataMinerID}/{relation.ParameterA.EID}"}, // Related Element
-			                    new GQICell {Value= relation.ParameterB.GetKey() }, // Related Parameter,
-			                    new GQICell {Value= relation.ParameterB.TableIdx }, // Related TableKey,
-			                    new GQICell {Value= relation.Confidence }, // Confidence,		
-			                };
+                                new GQICell {Value= relation.ParameterB.GetKey() }, // Related Parameter,
+                                new GQICell {Value= relation.ParameterB.TableIdx }, // Related TableKey,
+                                new GQICell {Value= relation.Confidence }, // Confidence,
+						};
 
                         var elementID = new ElementID(relation.ParameterB.DataMinerID, relation.ParameterA.EID);
                         var elementMetadata = new ObjectRefMetadata { Object = elementID };
@@ -143,6 +132,7 @@ public class TimeScopedRelations : IGQIDataSource, IGQIOnInit, IGQIOnPrepareFetc
                 }
             }
         }
+
         return new GQIPage(rows.ToArray()) { HasNextPage = false };
     }
 }
